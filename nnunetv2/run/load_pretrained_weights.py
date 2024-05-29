@@ -75,7 +75,7 @@ def load_pretrained_weights_upkern(network, fname):
     print("################### Resampled Loading pretrained weights from file ", fname, '###################')
     
     saved_model = torch.load(fname)
-    pretrained_dict = saved_model['state_dict']
+    pretrained_dict = saved_model['network_weights']
 
     # if state dict comes from nn.DataParallel but we use non-parallel model here then the state dict keys do not
     # match. Use heuristic to make it match. # Fabian wrote this.

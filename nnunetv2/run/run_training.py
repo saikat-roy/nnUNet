@@ -93,9 +93,9 @@ def maybe_load_checkpoint(nnunet_trainer: nnUNetTrainer, continue_training: bool
             if not nnunet_trainer.was_initialized:
                 nnunet_trainer.initialize()
             if 'MedNeXt' in type(nnunet_trainer).__name__ and 'kernel5' in type(nnunet_trainer).__name__:
-                load_pretrained_weights_upkern(nnunet_trainer.network, pretrained_weights_file, verbose=True)
+                load_pretrained_weights_upkern(nnunet_trainer.network, pretrained_weights_file)
             else:
-                load_pretrained_weights(nnunet_trainer.network, pretrained_weights_file)
+                load_pretrained_weights(nnunet_trainer.network, pretrained_weights_file, verbose=True)
         expected_checkpoint_file = None
 
     if expected_checkpoint_file is not None:

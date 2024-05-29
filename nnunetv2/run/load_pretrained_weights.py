@@ -3,6 +3,8 @@ from torch._dynamo import OptimizedModule
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 
+import warnings
+
 
 def load_pretrained_weights(network, fname, verbose=False):
     """
@@ -68,3 +70,61 @@ def load_pretrained_weights(network, fname, verbose=False):
     mod.load_state_dict(model_dict)
 
 
+def load_pretrained_weights_upkern(network, fname):
+
+    print("################### Resampled Loading pretrained weights from file ", fname, '###################')
+    
+    saved_model = torch.load(fname)
+    pretrained_dict = saved_model['state_dict']
+
+    # if state dict comes from nn.DataParallel but we use non-parallel model here then the state dict keys do not
+    # match. Use heuristic to make it match. # Fabian wrote this.
+    new_state_dict = {}
+    for k, value in pretrained_dict.items():
+        key = k
+        # remove module. prefix from DDP models
+        if key.startswith('module.'):
+            key = key[7:]
+        new_state_dict[key] = value
+
+    pretrained_dict = new_state_dict
+    model_dict = network.state_dict()
+    
+    for k in model_dict.keys():
+        # print(k, model_dict[k].shape, pretrained_dict[k].shape)
+
+        if k in model_dict.keys() and k in pretrained_dict.keys():  # Common keys
+            if 'bias' in k or 'norm' in k or 'dummy' in k:
+                print(f"Key {k} loaded unchanged.")
+                model_dict[k] = pretrained_dict[k]
+            else:
+                inc1, outc1, *spatial_dims1 = model_dict[k].shape
+                inc2, outc2, *spatial_dims2 = pretrained_dict[k].shape
+                print(inc1, outc1, spatial_dims1, inc2, outc2, spatial_dims2)
+
+                assert inc1==inc2 # Please use equal in_channels in all layers for resizing pretrainer
+                assert outc1 == outc2 # Please use equal out_channels in all layers for resizing pretrainer
+                
+                if spatial_dims1 == spatial_dims2:
+                    model_dict[k] = pretrained_dict[k]
+                    print(f"Key {k} loaded.")
+                else:
+                    if len(spatial_dims1)==3:
+                        model_dict[k] = torch.nn.functional.interpolate(
+                                                pretrained_dict[k], size=spatial_dims1,
+                                                mode='trilinear'
+                                                )
+                        print(f"Key {k} interpolated trilinearly from {spatial_dims2}->{spatial_dims1} and loaded.")
+                    elif len(spatial_dims1)==2:
+                        model_dict[k] = torch.nn.functional.interpolate(
+                                                pretrained_dict[k], size=spatial_dims1,
+                                                mode='bilinear'
+                                                )
+                        print(f"Key {k} interpolated bilinearly from {spatial_dims2}->{spatial_dims1} and loaded.")
+                    else:
+                        raise TypeError('UpKern only supports 2D and 3D shapes.')
+        else:   # Keys which are not shared
+            warnings.warn(f"Key {k} in current_model:{k in model_dict.keys()} and pretrained_model:{k in pretrained_dict.keys()} and will not be loaded.")
+
+    network.load_state_dict(model_dict)
+    print("######## Weight Loading DONE ############")

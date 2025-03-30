@@ -15,6 +15,11 @@ class MedNeXtPlanner(ExperimentPlanner):
                     'patch_size': (128, 128, 128),
                     'batch_size': 2,
                 }
+        plans['configurations']['2d_mednext'] = {
+                    'inherits_from': '2d',
+                    'patch_size': (512, 512),
+                    'batch_size': 8,
+                }
 
         self.save_plans(plans)
         return plans

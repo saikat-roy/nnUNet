@@ -18,7 +18,6 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
         super().__init__(plans, configuration, fold, dataset_json, device)
         self.initial_lr = 1e-3
         self.num_of_mednext_ds_outputs = 5
-        self.num_epochs = 1
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(

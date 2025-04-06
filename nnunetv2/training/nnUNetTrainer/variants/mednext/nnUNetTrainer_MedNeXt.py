@@ -77,7 +77,7 @@ class nnUNetTrainer_MedNeXt_S_kernel3(nnUNetTrainer_MedNeXt):
             arch_init_kwargs_req_import: Union[List[str], Tuple[str, ...]],
             num_input_channels: int,
             num_output_channels: int,
-            enable_deep_supervision: bool = False
+            enable_deep_supervision: bool = True
         ):
         
         network = MedNeXt(
@@ -105,7 +105,7 @@ class nnUNetTrainer_MedNeXt_B_kernel3(nnUNetTrainer_MedNeXt):
             arch_init_kwargs_req_import: Union[List[str], Tuple[str, ...]],
             num_input_channels: int,
             num_output_channels: int,
-            enable_deep_supervision: bool = False
+            enable_deep_supervision: bool = True
         ):
         
         network = MedNeXt(
@@ -133,7 +133,7 @@ class nnUNetTrainer_MedNeXt_M_kernel3(nnUNetTrainer_MedNeXt):
             arch_init_kwargs_req_import: Union[List[str], Tuple[str, ...]],
             num_input_channels: int,
             num_output_channels: int,
-            enable_deep_supervision: bool = False
+            enable_deep_supervision: bool = True
         ):
         
         network = MedNeXt(
@@ -161,7 +161,7 @@ class nnUNetTrainer_MedNeXt_L_kernel3(nnUNetTrainer_MedNeXt):
             arch_init_kwargs_req_import: Union[List[str], Tuple[str, ...]],
             num_input_channels: int,
             num_output_channels: int,
-            enable_deep_supervision: bool = False
+            enable_deep_supervision: bool = True
         ):
         
         network = MedNeXt(

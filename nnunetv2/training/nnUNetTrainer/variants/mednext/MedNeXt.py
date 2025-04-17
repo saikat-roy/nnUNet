@@ -265,8 +265,8 @@ class MedNeXt(nn.Module):
 
         self.out_0 = OutBlock(in_channels=n_channels, n_classes=n_classes, dim=dim)
 
-        # Used to fix PyTorch checkpointing bug
-        self.dummy_tensor = nn.Parameter(torch.tensor([1.]), requires_grad=True)  
+        # Used previously to fix PyTorch checkpointing bug
+        # self.dummy_tensor = nn.Parameter(torch.tensor([1.]), requires_grad=True)  
 
         if deep_supervision:
             self.out_1 = OutBlock(in_channels=n_channels*2, n_classes=n_classes, dim=dim)
@@ -289,7 +289,7 @@ class MedNeXt(nn.Module):
             if l_idx==0 and self.leave_one_block_out:
                 x = l(x)
                 continue
-            x = checkpoint.checkpoint(l, x, self.dummy_tensor)
+            x = checkpoint.checkpoint(l, x, use_reentrant=False)
         return x
 
 

@@ -36,21 +36,21 @@ class MedNeXtPlannerDDP(ExperimentPlanner):
         
         # Modify the patch size and batch size in the plan for DDP training.
         # Designed for 8x A100 GPUs
-        plans['configurations']['3d_fullres_mednext_ddp_16'] = {
+        plans['configurations']['3d_fullres_mednext_ddp_8'] = {
                     'inherits_from': '3d_fullres',
                     'patch_size': (128, 128, 128),
                     'batch_size': 16,
                 }
         
         # Designed for 4x A100 GPUs
-        plans['configurations']['3d_fullres_mednext_ddp_16'] = {
+        plans['configurations']['3d_fullres_mednext_ddp_4'] = {
                     'inherits_from': '3d_fullres',
                     'patch_size': (128, 128, 128),
                     'batch_size': 8,
                 }
         
         # Designed for 2x A100 GPUs
-        plans['configurations']['3d_fullres_mednext_ddp_16'] = {
+        plans['configurations']['3d_fullres_mednext_ddp_2'] = {
                     'inherits_from': '3d_fullres',
                     'patch_size': (128, 128, 128),
                     'batch_size': 4,

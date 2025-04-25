@@ -11,7 +11,7 @@ from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 from nnunetv2.utilities.helpers import dummy_context
 
 
-class nnUNetTrainer_MedNeXt(nnUNetTrainer):
+class nnUNetTrainer_MedNeXt_base(nnUNetTrainer):
 
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
@@ -57,9 +57,21 @@ class nnUNetTrainer_MedNeXt(nnUNetTrainer):
         else:
             deep_supervision_scales = None  # for train and val_transforms
         return deep_supervision_scales
-    
 
-class nnUNetTrainer_MedNeXt_k5(nnUNetTrainer_MedNeXt):
+    @staticmethod
+    def build_network_architecture(
+            architecture_class_name: str,
+            arch_init_kwargs: dict,
+            arch_init_kwargs_req_import: Union[List[str], Tuple[str, ...]],
+            num_input_channels: int,
+            num_output_channels: int,
+            enable_deep_supervision: bool = True
+        ):
+        raise NotImplementedError(
+            "This method should be implemented in the child class. It is used to build the network architecture.")
+
+
+class nnUNetTrainer_MedNeXt_k5_base(nnUNetTrainer_MedNeXt_base):
 
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
@@ -68,7 +80,7 @@ class nnUNetTrainer_MedNeXt_k5(nnUNetTrainer_MedNeXt):
 
 
 # MedNeXt trainers for kernel size 3x3x3
-class nnUNetTrainer_MedNeXt_S_kernel3(nnUNetTrainer_MedNeXt):
+class nnUNetTrainer_MedNeXt_S_kernel3(nnUNetTrainer_MedNeXt_base):
 
     @staticmethod
     def build_network_architecture(
@@ -96,7 +108,7 @@ class nnUNetTrainer_MedNeXt_S_kernel3(nnUNetTrainer_MedNeXt):
         return network
 
 
-class nnUNetTrainer_MedNeXt_B_kernel3(nnUNetTrainer_MedNeXt):
+class nnUNetTrainer_MedNeXt_B_kernel3(nnUNetTrainer_MedNeXt_base):
 
     @staticmethod
     def build_network_architecture(
@@ -124,7 +136,7 @@ class nnUNetTrainer_MedNeXt_B_kernel3(nnUNetTrainer_MedNeXt):
         return network
 
 
-class nnUNetTrainer_MedNeXt_M_kernel3(nnUNetTrainer_MedNeXt):
+class nnUNetTrainer_MedNeXt_M_kernel3(nnUNetTrainer_MedNeXt_base):
 
     @staticmethod
     def build_network_architecture(
@@ -152,7 +164,7 @@ class nnUNetTrainer_MedNeXt_M_kernel3(nnUNetTrainer_MedNeXt):
         return network
 
 
-class nnUNetTrainer_MedNeXt_L_kernel3(nnUNetTrainer_MedNeXt):
+class nnUNetTrainer_MedNeXt_L_kernel3(nnUNetTrainer_MedNeXt_base):
 
     @staticmethod
     def build_network_architecture(
@@ -181,7 +193,7 @@ class nnUNetTrainer_MedNeXt_L_kernel3(nnUNetTrainer_MedNeXt):
     
     
 # MedNeXt trainers for kernel size 5x5x5
-class nnUNetTrainer_MedNeXt_S_kernel5(nnUNetTrainer_MedNeXt_k5):
+class nnUNetTrainer_MedNeXt_S_kernel5(nnUNetTrainer_MedNeXt_k5_base):
 
     @staticmethod
     def build_network_architecture(
@@ -209,7 +221,7 @@ class nnUNetTrainer_MedNeXt_S_kernel5(nnUNetTrainer_MedNeXt_k5):
         return network
 
 
-class nnUNetTrainer_MedNeXt_B_kernel5(nnUNetTrainer_MedNeXt_k5):
+class nnUNetTrainer_MedNeXt_B_kernel5(nnUNetTrainer_MedNeXt_k5_base):
 
     @staticmethod
     def build_network_architecture(
@@ -237,7 +249,7 @@ class nnUNetTrainer_MedNeXt_B_kernel5(nnUNetTrainer_MedNeXt_k5):
         return network
 
 
-class nnUNetTrainer_MedNeXt_M_kernel5(nnUNetTrainer_MedNeXt_k5):
+class nnUNetTrainer_MedNeXt_M_kernel5(nnUNetTrainer_MedNeXt_k5_base):
 
     @staticmethod
     def build_network_architecture(
@@ -265,7 +277,7 @@ class nnUNetTrainer_MedNeXt_M_kernel5(nnUNetTrainer_MedNeXt_k5):
         return network
 
 
-class nnUNetTrainer_MedNeXt_L_kernel5(nnUNetTrainer_MedNeXt_k5):
+class nnUNetTrainer_MedNeXt_L_kernel5(nnUNetTrainer_MedNeXt_k5_base):
 
     @staticmethod
     def build_network_architecture(

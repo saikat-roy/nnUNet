@@ -248,6 +248,12 @@ def aa11_inference_entry_point():
                         help="Use this to set the device the inference should run with. Available options are 'cuda' "
                              "(GPU), 'cpu' (CPU) and 'mps' (Apple M1/M2). Do NOT use this to set which GPU ID! "
                              "Use CUDA_VISIBLE_DEVICES=X nnUNetv2_predict [...] instead!")
+    parser.add_argument('--num_parts', type=int, required=False, default=1,
+                        help='Number of GPUs used for inference, default 1. This does NOT automatically do multi-GPU '
+                             'inference! It only splits the input data accordingly')
+    parser.add_argument('--part_id', type=int, required=False, default=0,
+                        help='ID of the GPU used for inference, default 0. This does NOT automatically do multi-GPU '
+                             'inference! It is only used to choose the correct split')
     parser.add_argument('--disable_progress_bar', action='store_true', required=False, default=False,
                         help='Set this flag to disable progress bar. Recommended for HPC environments (non interactive '
                              'jobs)')
@@ -304,7 +310,8 @@ def aa11_inference_entry_point():
                                  num_processes_preprocessing=args.npp,
                                  num_processes_segmentation_export=args.nps,
                                  folder_with_segs_from_prev_stage=args.prev_stage_predictions,
-                                 num_parts=1, part_id=0)
+                                 num_parts=args.num_parts,
+                                 part_id=args.part_id)
 
 
 if __name__ == "__main__":

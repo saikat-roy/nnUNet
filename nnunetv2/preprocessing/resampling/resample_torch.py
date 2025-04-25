@@ -123,6 +123,8 @@ def resample_torch_fornnunet(
         if was_numpy:
             data = torch.from_numpy(data)
 
+        if not isinstance(axis, list):
+            axis = [axis,]
         assert len(axis) == 1
         axis = axis[0]
         tmp = "xyz"

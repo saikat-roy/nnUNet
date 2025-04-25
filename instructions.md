@@ -68,4 +68,4 @@ __NOTE:__ This will make things faster in principle but might significantly incr
 
 
 # Training details
-Similar to Touchstone, the network was trained using the native Distributed Data Parallel (DDP) training supported by nnUNet on 8 A100 GPUs with a global batch size of $16$ (local batch size per GPU: $16/8 = 2$). The model was trained with a patch size of $128 \times 128 \times 128$ with learning rate of $1e-3$ using `AdamW` as the optimizer and nnUNet's standard data augmentation and learning rate scheduler.
+Similar to Touchstone, the network was trained using the native Distributed Data Parallel (DDP) training supported by nnUNet on 8 A100 GPUs with a global batch size of $16$ (local batch size per GPU: $16/8 = 2$). The model was trained with a patch size of $128 \times 128 \times 128$ with an $1.0m \times 1.0mm \times 1.0mm$ isotropic spacing, with a learning rate of $1e-3$ using `AdamW` as the optimizer and nnUNet's standard data augmentation and learning rate scheduler.

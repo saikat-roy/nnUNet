@@ -1,145 +1,56 @@
-from typing import Union
-
-import multiprocessing
 from multiprocessing.pool import Pool
+import nibabel as nib
 import numpy as np
 import torch
+from batchgenerators.utilities.file_and_folder_operations import maybe_mkdir_p, isdir
+from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 from pathlib import Path
-import os
-from time import sleep
-from warnings import warn
-
-from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
-from batchgenerators.utilities.file_and_folder_operations import maybe_mkdir_p, isdir, load_json, save_pickle, join
-
-from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
-from nnunetv2.inference.export_prediction import convert_predicted_logits_to_segmentation_with_correct_shape
-from nnunetv2.configuration import default_num_processes
-from nnunetv2.inference.sliding_window_prediction import compute_gaussian
-from nnunetv2.utilities.file_path_utilities import check_workers_alive_and_busy
-from nnunetv2.utilities.helpers import empty_cache
-from nnunetv2.utilities.plans_handling.plans_handler import PlansManager, ConfigurationManager
 
 
-label_mapping = {
-    "aorta": 1,
-    "gall_bladder": 2,
-    "kidney_left": 3,
-    "kidney_right": 4,
-    "liver": 5,
-    "pancreas": 6,
-    "postcava": 7,
-    "spleen": 8,
-    "stomach": 9,
-    "adrenal_gland_left": 10,
-    "adrenal_gland_right": 11,
-    "bladder": 12,
-    "celiac_trunk": 13,
-    "colon": 14,
-    "duodenum": 15,
-    "esophagus": 16,
-    "femur_left": 17,
-    "femur_right": 18,
-    "hepatic_vessel": 19,
-    "intestine": 20,
-    "lung_left": 21,
-    "lung_right": 22,
-    "portal_vein_and_splenic_vein": 23,
-    "prostate": 24,
-    "rectum": 25,
-}
+def convert_segmnetation_to_aa11_format(segmentation_file):
+    mapping = {
+        "background": 0,
+        "aorta": 1,
+        "gall_bladder": 2,
+        "kidney_left": 3,
+        "kidney_right": 4,
+        "liver": 5,
+        "pancreas": 6,
+        "postcava": 7,
+        "spleen": 8,
+        "stomach": 9,
+        "adrenal_gland_left": 10,
+        "adrenal_gland_right": 11,
+        "bladder": 12,
+        "celiac_trunk": 13,
+        "colon": 14,
+        "duodenum": 15,
+        "esophagus": 16,
+        "femur_left": 17,
+        "femur_right": 18,
+        "hepatic_vessel": 19,
+        "intestine": 20,
+        "lung_left": 21,
+        "lung_right": 22,
+        "portal_vein_and_splenic_vein": 23,
+        "prostate": 24,
+        "rectum": 25,
+    }
+
+    segmentation_file = Path(segmentation_file)
+    dir_name = segmentation_file.parent/segmentation_file
+    dir_name.mkdir(exist_ok=True, parents=True)
+    seg_nifti = nib.load(segmentation_file.with_suffix(".nii.gz"))
+    seg_data = seg_nifti.get_fdata()
+    for k, v in mapping.items():
+        class_seg = (seg_data == v).astype(np.uint8)
+        class_nifti = nib.Nifti1Image(class_seg, seg_nifti.affine)
+        nib.save(class_nifti, dir_name/f"{k}.nii.gz")
+    (segmentation_file.with_suffix(".nii.gz")).unlink()
 
 
-def export_prediction_from_logits_custom(predicted_array_or_file: Union[np.ndarray, torch.Tensor], properties_dict: dict,
-                                  configuration_manager: ConfigurationManager,
-                                  plans_manager: PlansManager,
-                                  dataset_json_dict_or_file: Union[dict, str], output_file_truncated: str,
-                                  save_probabilities: bool = False,
-                                  num_threads_torch: int = default_num_processes):
-
-    if isinstance(dataset_json_dict_or_file, str):
-        dataset_json_dict_or_file = load_json(dataset_json_dict_or_file)
-
-    label_manager = plans_manager.get_label_manager(dataset_json_dict_or_file)
-    ret = convert_predicted_logits_to_segmentation_with_correct_shape(
-        predicted_array_or_file, plans_manager, configuration_manager, label_manager, properties_dict,
-        return_probabilities=save_probabilities, num_threads_torch=num_threads_torch
-    )
-    del predicted_array_or_file
-
-    # save
-    if save_probabilities:
-        warn("Saving probabilities is not supported for this dataset, will be ignored.")
-
-    Path(output_file_truncated).mkdir(parents=True, exist_ok=True)
-    for lbl_name, lbl in label_mapping.items():
-        seg_lbl = (ret == lbl).astype(np.uint8)
-        rw = plans_manager.image_reader_writer_class()
-        rw.write_seg(seg_lbl, join(output_file_truncated, lbl_name + dataset_json_dict_or_file['file_ending']),
-                     properties_dict)
-
-
-class MedNeXtPredictor(nnUNetPredictor):
-    def predict_from_data_iterator(self,
-                                   data_iterator,
-                                   save_probabilities: bool = False,
-                                   num_processes_segmentation_export: int = default_num_processes):
-        """
-        each element returned by data_iterator must be a dict with 'data', 'ofile' and 'data_properties' keys!
-        If 'ofile' is None, the result will be returned instead of written to a file
-        """
-        with multiprocessing.get_context("spawn").Pool(num_processes_segmentation_export) as export_pool:
-            worker_list = [i for i in export_pool._pool]
-            r = []
-            for preprocessed in data_iterator:
-                data = preprocessed['data']
-                if isinstance(data, str):
-                    delfile = data
-                    data = torch.from_numpy(np.load(data))
-                    os.remove(delfile)
-
-                ofile = preprocessed['ofile']
-                if ofile is not None:
-                    print(f'\nPredicting {os.path.basename(ofile)}:')
-                else:
-                    print(f'\nPredicting image of shape {data.shape}:')
-
-                print(f'perform_everything_on_device: {self.perform_everything_on_device}')
-
-                properties = preprocessed['data_properties']
-
-                # let's not get into a runaway situation where the GPU predicts so fast that the disk has to b swamped with
-                # npy files
-                proceed = not check_workers_alive_and_busy(export_pool, worker_list, r, allowed_num_queued=2)
-                while not proceed:
-                    sleep(0.1)
-                    proceed = not check_workers_alive_and_busy(export_pool, worker_list, r, allowed_num_queued=2)
-
-                prediction = self.predict_logits_from_preprocessed_data(data).cpu()
-
-                assert ofile is not None, "No output file is given, this does not work for the custom AbdomenAtlas 1.1 inference!"
-
-                r.append(
-                    export_pool.starmap_async(
-                        export_prediction_from_logits_custom,
-                        ((prediction, properties, self.configuration_manager, self.plans_manager,
-                            self.dataset_json, ofile, save_probabilities),)
-                    )
-                )
-            ret = [i.get()[0] for i in r]
-
-        if isinstance(data_iterator, MultiThreadedAugmenter):
-            data_iterator._finish()
-
-        # clear lru cache
-        compute_gaussian.cache_clear()
-        # clear device cache
-        empty_cache(self.device)
-        return ret
-
-
-def aa11_inference_entry_point():
+def aa11_inference_entry_point(allowed_mirroring_axes = (0, 1, 2), disable_tta=None):
     import argparse
     parser = argparse.ArgumentParser(description='Use this to run inference with nnU-Net. This function is used when '
                                                  'you want to manually specify a folder containing a trained nnU-Net '
@@ -163,7 +74,6 @@ def aa11_inference_entry_point():
     parser.add_argument('--disable_tta', action='store_true', required=False, default=False,
                         help='Set this flag to disable test time data augmentation in the form of mirroring. Faster, '
                              'but less accurate inference. Not recommended.')
-    parser.add_argument('--allowed_mirroring_axes', type=int, nargs='+', required=False, default=[0, 1, 2]),
     parser.add_argument('--verbose', action='store_true', help="Set this if you like being talked to. You will have "
                                                                "to be a good listener/reader.")
     parser.add_argument('--save_probabilities', action='store_true',
@@ -197,6 +107,8 @@ def aa11_inference_entry_point():
         "Nature methods, 18(2), 203-211.\n#######################################################################\n")
 
     args = parser.parse_args()
+    if disable_tta is not None:
+        args.disable_tta = disable_tta
     args.f = [i if i == 'all' else int(i) for i in args.f]
 
     if not isdir(args.o):
@@ -217,7 +129,7 @@ def aa11_inference_entry_point():
     else:
         device = torch.device('mps')
 
-    predictor = MedNeXtPredictor(tile_step_size=args.step_size,
+    predictor = nnUNetPredictor(tile_step_size=args.step_size,
                                 use_gaussian=True,
                                 use_mirroring=not args.disable_tta,
                                 perform_everything_on_device=True,
@@ -226,13 +138,7 @@ def aa11_inference_entry_point():
                                 allow_tqdm=not args.disable_progress_bar,
                                 verbose_preprocessing=args.verbose)
     predictor.initialize_from_trained_model_folder(args.m, args.f, args.chk)
-    if not all([i in predictor.allowed_mirroring_axes for i in args.allowed_mirroring_axes]):
-        warn(
-            f"Some of the mirroring axes you specified are not supported by the model.\n"
-            f"Allowed axes are: {predictor.allowed_mirroring_axes}.\n"
-            f"Requested axes: {args.allowed_mirroring_axes}.\n"
-            f"Will use the allowed axes instead.")
-    predictor.allowed_mirroring_axes = [i for i in args.allowed_mirroring_axes if i in predictor.allowed_mirroring_axes]
+    predictor.allowed_mirroring_axes = allowed_mirroring_axes
     # why do some libraries not handle Path objects correctly?!
     input_files = [[str(p/"ct.nii.gz"),] for p in Path(args.i).iterdir() if (p/"ct.nii.gz").is_file()]
     output_files = [str(Path(args.o)/(p.name)) for p in Path(args.i).iterdir() if (p/"ct.nii.gz").is_file()]
@@ -242,7 +148,21 @@ def aa11_inference_entry_point():
                                  num_processes_segmentation_export=args.nps,
                                  folder_with_segs_from_prev_stage=args.prev_stage_predictions,
                                  num_parts=1, part_id=0)
+    with Pool(8) as p:
+        p.map(convert_segmnetation_to_aa11_format, output_files)
+    
+
+def aa11_inference_entry_point_12():
+    aa11_inference_entry_point(allowed_mirroring_axes=(0, 1))
+
+
+def aa11_inference_entry_point_2():
+    aa11_inference_entry_point(allowed_mirroring_axes=(1,))
+
+
+def aa11_inference_entry_point_notta():
+    aa11_inference_entry_point(disable_tta=True)
 
 
 if __name__ == "__main__":
-    aa11_inference_entry_point()
+    aa11_inference_entry_point_notta()
